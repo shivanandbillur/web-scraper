@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { chromium } from 'playwright';
+import OpenAI from 'openai';
+import fs from 'fs';
+import path from 'path';
+import db from '../../../lib/db';
 
-// Keep the route dynamic and allow long execution times
-export const maxDuration = 300; // 5 minutes (requires Pro plan on Vercel, but local works fine)
+export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
@@ -10,94 +13,138 @@ export async function POST(req: Request) {
   const readable = new ReadableStream({
     async start(controller) {
       function sendUpdate(type: string, data: any) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type, data })}\n\n`));
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type, data })}\n\n`));
+        } catch { /* stream closed */ }
       }
 
       let browser = null;
       try {
-        const { searchQuery, searchEngine, numResults = 5 } = await req.json();
+        const payload = await req.json();
+        const { query, numResults = 10 } = payload;
 
-        if (!searchQuery) {
-          sendUpdate('error', 'Search Query is required.');
+        const openAiKey = process.env.OPENAI_API_KEY;
+        if (!openAiKey) {
+          sendUpdate('error', "OpenAI API Key is missing in .env.local file. Please add it and restart the server.");
           controller.close();
           return;
         }
 
-        sendUpdate('log', `Launching local browser automation without APIs...`);
-        browser = await chromium.launch({ headless: true }); // headless: true for background, but can be false for "normal browser" experience
+        const targetCount = Math.min(Number(numResults) || 10, 1000);
+
+        // --- EXCLUSION LOGIC (Read from SQLite + leadsc - sheet1 (1).csv) --- //
+        sendUpdate('log', `Reading exclusion list from Database and leadsc - sheet1 (1).csv...`);
+        const exclusionSet = new Set<string>();
+
+        const csvPath = path.join(process.cwd(), 'leadsc - sheet1 (1).csv');
+        if (fs.existsSync(csvPath)) {
+          const fileContent = fs.readFileSync(csvPath, 'utf-8');
+          const matches = fileContent.match(/https?:\/\/[a-z]{0,3}\.?linkedin\.com\/in\/[^\s",]+/gi);
+          if (matches) {
+            matches.forEach(m => exclusionSet.add(m.split('?')[0].replace(/\/$/, "").toLowerCase()));
+          }
+        }
+
+        // Also fetch any existing leads from the SQLite database
+        const dbLeads = db.prepare('SELECT url FROM leads').all();
+        dbLeads.forEach((l: any) => exclusionSet.add(l.url.toLowerCase()));
+
+        sendUpdate('log', `Loaded a total of ${exclusionSet.size} unique URLs into the Exclusion Filter.`);
+
+        // --- CORE EXTRACTION LOOP --- //
+        browser = await chromium.launch({ headless: true });
         const context = await browser.newContext({
           userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         });
         const page = await context.newPage();
 
-        sendUpdate('log', `Navigating to search engine: ${searchEngine}`);
-        let urls: string[] = [];
+        let collectedLeads: any[] = [];
+        const openai = new OpenAI({ apiKey: openAiKey });
 
-        // Build X-Ray search query
-        const modifiedQuery = `site:linkedin.com/in/ OR site:linkedin.com/pub/ ${searchQuery}`;
+        while (collectedLeads.length < targetCount) {
+          sendUpdate('log', `[Goal: ${collectedLeads.length}/${targetCount}] Initializing Agentic AI Planner to craft novel search queries...`);
 
-        if (searchEngine === 'google') {
-          await page.goto(`https://search.yahoo.com/search?p=${encodeURIComponent(modifiedQuery)}`, { waitUntil: 'domcontentloaded' });
-          await page.waitForTimeout(2000);
+          const prevQueriesRaw = db.prepare('SELECT query_text FROM queries').all();
+          const previousQueries = prevQueriesRaw.map((q: any) => q.query_text);
 
-          urls = await page.evaluate(() => {
-            const results = Array.from(document.querySelectorAll('div.compTitle a'));
-            return results
-              .map(a => (a as HTMLAnchorElement).href)
-              .filter(h => h.startsWith('http'))
-              .filter(h => h.includes('linkedin.com/in') || h.includes('linkedin.com/pub'))
-              .filter((v, i, a) => a.indexOf(v) === i);
+          const prompt = `
+          The user is looking for LinkedIn profiles based on a natural language intent.
+          Your goal is to output exactly 3 novel Google/Yahoo X-Ray search query strings.
+          The query must begin with: site:linkedin.com/in/
+          
+          User Request: "${query}"
+          Location Scope: "India" (defaulting to India. Only include people in India).
+          
+          Rules for Offline Marketing:
+          - If the user wants offline marketers or BTL managers, INCLUDE people working AT brands/companies.
+          - EXCLUDE people working at marketing agencies or ad agencies (use: -agency -"marketing agency" -"ad agency" etc).
+          - Be creative with synonyms (e.g. "Below the line", "Experiential", "BTL").
+          - CRITICAL: AVOID generating queries exactly matching these previous ones: ${JSON.stringify(previousQueries).substring(0, 1500)}...
+          
+          Provide the 3 queries in a clean JSON string array [ "site:... ", "site:... "].
+          DO NOT include markdown block formatting, text wrappers, or any conversational text. Return the raw valid JSON array ONLY.
+          `;
+
+          const aiRes = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.9 // High temperature for diverse query structures 
           });
-        } else if (searchEngine === 'bing') {
-          await page.goto(`https://search.yahoo.com/search?p=${encodeURIComponent(modifiedQuery)}`, { waitUntil: 'domcontentloaded' });
-          await page.waitForTimeout(2000);
 
-          urls = await page.evaluate(() => {
-            const results = Array.from(document.querySelectorAll('div.compTitle a'));
-            return results
-              .map(a => (a as HTMLAnchorElement).href)
-              .filter(h => h.startsWith('http'))
-              .filter(h => h.includes('linkedin.com/in') || h.includes('linkedin.com/pub'))
-              .filter((v, i, a) => a.indexOf(v) === i);
-          });
-        }
-
-        urls = urls.slice(0, numResults);
-        sendUpdate('log', `Found ${urls.length} target pages to visit.`);
-        sendUpdate('urls', urls);
-
-        const extractedData = [];
-
-        // Try extracting info from each page algorithmicly (Regex + DOM)
-        for (let i = 0; i < urls.length; i++) {
-          const url = urls[i];
-          sendUpdate('log', `Visiting (${i + 1}/${urls.length}): ${url}`);
-          sendUpdate('current_url', url);
-
+          let generatedQueries = [];
           try {
-            await page.goto(url, { timeout: 30000 });
-            await page.waitForLoadState('domcontentloaded');
+            const text = aiRes.choices[0].message.content || '[]';
+            generatedQueries = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+            if (!Array.isArray(generatedQueries) || generatedQueries.length === 0) throw new Error("empty");
+          } catch {
+            sendUpdate('log', `Failed to parse AI response natively. Creating fallback query.`);
+            generatedQueries = [`site:linkedin.com/in/ "${query}" "India" -agency`];
+          }
 
-            sendUpdate('log', `Extracting structured data algorithmically from ${url}...`);
+          sendUpdate('ai_queries', generatedQueries);
+          sendUpdate('log', `AI Selected ${generatedQueries.length} Optimized Queries to run for this batch.`);
 
-            // Extract visible text and DOM attributes specifically tailored for LinkedIn Public Profiles
-            const extracted = await page.evaluate(() => {
-              // Extract Meta Tags (LinkedIn populates meta perfectly for public profiles)
-              const titleNode = document.title || '';
-              const metaDescNode = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
-              const ogTitleNode = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || '';
+          let offset = 1;
+          let queryIndex = 0;
 
-              // Example meta description from LinkedIn: "San Francisco, California, United States. 500+ connections..." or "View X's profile on LinkedIn, the world's largest professional community. X has 3 jobs listed on their profile."
-              // The og:title is usually "First Last - Job Title - Company | LinkedIn"
+          while (collectedLeads.length < targetCount && queryIndex < generatedQueries.length) {
+            const activeSearchTerm = generatedQueries[queryIndex];
 
-              let name = "";
-              let title = "";
-              let company = "";
-              const location = "Unknown";
+            // Verify we haven't run this query already
+            try {
+              db.prepare('INSERT INTO queries (query_text) VALUES (?)').run(activeSearchTerm);
+            } catch (e) {
+              sendUpdate('log', `[Query ${queryIndex + 1}/${generatedQueries.length}] Already processed in DB. Skipping to save time.`);
+              offset = 1;
+              queryIndex++;
+              continue;
+            }
 
-              try {
-                // Parse ogTitle: "John Doe - Manager - Apple | LinkedIn"
-                const parts = ogTitleNode.split(' - ');
+            const searchUrl = `https://search.yahoo.com/search?p=${encodeURIComponent(activeSearchTerm)}&b=${offset}`;
+            sendUpdate('log', `[Query ${queryIndex + 1}/${generatedQueries.length}] Searching Directory... Offset: ${offset}`);
+
+            await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
+
+            // Artificial delay to prevent search engine blockage
+            const delay = 2500 + Math.random() * 2000;
+            sendUpdate('log', `Pausing for ${Math.round(delay / 1000)}s to imitate human browsing...`);
+            await page.waitForTimeout(delay);
+
+            const urlsFromPage = await page.evaluate(() => {
+              const rows = document.querySelectorAll('.compTitle');
+              return Array.from(rows).map(row => {
+                const a = row.querySelector('a');
+                const url = a ? a.href : '';
+                const titleText = a ? a.innerText : '';
+                const parent = row.parentElement;
+                const descNode = parent?.querySelector('.compText');
+                const descText = descNode ? (descNode as HTMLElement).innerText : '';
+
+                let name = "Unknown";
+                let title = "Unknown";
+                let company = "Unknown";
+
+                const parts = titleText.split(' - ');
                 if (parts.length > 0) name = parts[0].trim();
                 if (parts.length > 1) {
                   const subParts = parts[1].split(' | ');
@@ -108,43 +155,77 @@ export async function POST(req: Request) {
                   company = companyParts[0].trim();
                 }
 
-                // If fallback mapping is needed, check standard h1 tags in public profile
-                if (!name) name = document.querySelector('h1')?.innerText?.trim() || 'Unknown';
-                if (!title) title = document.querySelector('h2')?.innerText?.trim() || 'Unknown';
-              } catch { }
-
-              // Try extracting emails from the page text just in case they listed it
-              const bodyText = document.body.innerText || '';
-              const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-              const rawEmails = bodyText.match(emailRegex) || [];
-              const emails = Array.from(new Set(rawEmails.map(e => e.toLowerCase())));
-
-              return [{
-                name,
-                jobTitle: title,
-                company,
-                location,
-                emails,
-                rawBio: metaDescNode
-              }];
+                return { url, name, title, company, bio: descText };
+              })
+                .filter(item => item.url.startsWith('http'))
+                .filter(item => item.url.includes('linkedin.com/in') || item.url.includes('linkedin.com/pub'));
             });
 
-            if (extracted && extracted.length > 0) {
-              const item = { url, data: extracted };
-              extractedData.push(item);
-              sendUpdate('item_extracted', item);
-              sendUpdate('log', `Success extracted data from ${url}.`);
-            } else {
-              sendUpdate('log', `Found no relevant data on ${url}.`);
+            if (urlsFromPage.length === 0) {
+              sendUpdate('log', `Search engine query results exhausted. Moving to next AI query...`);
+              offset = 1;
+              queryIndex++;
+              continue;
             }
 
-          } catch (error) {
-            sendUpdate('log', `Failed to visit ${url}: ${String(error)}`);
+            let added = 0;
+            for (const rawLead of urlsFromPage) {
+              const cleanUrl = rawLead.url.split('?')[0].replace(/\/$/, "").toLowerCase();
+
+              if (!collectedLeads.some(l => l.url.toLowerCase().includes(cleanUrl)) && !exclusionSet.has(cleanUrl)) {
+                if (rawLead.name === "Sign Up | LinkedIn") rawLead.name = "Unknown";
+
+                const extractedItem = {
+                  url: rawLead.url,
+                  data: [{
+                    name: rawLead.name,
+                    jobTitle: rawLead.title,
+                    company: rawLead.company,
+                    location: "India",
+                    emails: [],
+                    rawBio: rawLead.bio
+                  }]
+                };
+
+                collectedLeads.push(extractedItem);
+                added++;
+
+                // Save to SQLite
+                try {
+                  db.prepare(`
+                          INSERT INTO leads (url, name, job_title, company, location, emails, bio)
+                          VALUES (?, ?, ?, ?, ?, ?, ?)
+                       `).run(cleanUrl, rawLead.name, rawLead.title, rawLead.company, "India", "", rawLead.bio);
+                } catch (err) { /* ignore duplicate insertions if any edge case */ }
+
+                // Append perfectly into user CSV
+                try {
+                  const dateStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+                  const safeString = (str: string) => str.replace(/"/g, '""');
+                  const csvLine = `"${safeString(rawLead.name)}","${safeString(rawLead.title)}","","","","India","${safeString(rawLead.company)}","","India","","${rawLead.url}","","${dateStr}","AI WebAgent","Automated X-Ray","","","",\n`;
+                  fs.appendFileSync(csvPath, csvLine);
+                } catch (err) {
+                  sendUpdate('log', `Warning: Could not write to leadsc - sheet1 (1).csv`);
+                }
+
+                sendUpdate('item_extracted', extractedItem);
+              }
+              if (collectedLeads.length >= targetCount) break;
+            }
+
+            offset += 10;
+
+            if (added === 0 && urlsFromPage.length < 10 && offset > 30) {
+              sendUpdate('log', `Reached deep end of search pagination. Moving to next query...`);
+              offset = 1;
+              queryIndex++;
+              continue;
+            }
           }
         }
 
-        sendUpdate('log', `Job complete! Extracted total ${extractedData.length} entries.`);
-        sendUpdate('done', extractedData);
+        sendUpdate('log', `Job complete! Appended ${collectedLeads.length} leads directly into your database and CSV.`);
+        sendUpdate('done', collectedLeads);
 
       } catch (err) {
         sendUpdate('error', String(err));
@@ -162,4 +243,4 @@ export async function POST(req: Request) {
       'Connection': 'keep-alive',
     },
   });
-}
+} 
