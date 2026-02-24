@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         const csvPath = path.join(process.cwd(), 'leadsc - sheet1 (1).csv');
         if (fs.existsSync(csvPath)) {
           const fileContent = fs.readFileSync(csvPath, 'utf-8');
-          const matches = fileContent.match(/https?:\/\/[a-z]{0,3}\.?linkedin\.com\/in\/[^\s",]+/gi);
+          const matches = fileContent.match(/(?:https?:\/\/)?(?:[a-z]{0,3}\.)?linkedin\.com\/(?:in|pub)\/[^\s",?\/]+/gi);
           if (matches) {
             matches.forEach(m => {
               const cleanUrl = m.split('?')[0].replace(/\/$/, "").toLowerCase();
