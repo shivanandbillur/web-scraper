@@ -1,0 +1,108 @@
+﻿
+> temp-app@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+node.exe : Error: Cannot apply unknown 
+utility class `bg-[hsl(0,`
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" 
+"C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecifie 
+   d: (Error: Cannot a...ss `bg-[hsl(0,`  
+  :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeComma 
+   ndError
+ 
+    [2m[at onInvalidCandidate 
+(D:\website\web scraper tool for lead\node
+_modules\tailwindcss\dist\lib.js:21:1511)]
+[0m
+    [2m[at Ee (D:\website\web scraper 
+tool for lead\node_modules\tailwindcss\dis
+t\lib.js:16:36740)][0m
+    [2m[at D:\website\web scraper tool 
+for lead\node_modules\tailwindcss\dist\lib
+.js:21:355][0m
+    [2m[at Pr (D:\website\web scraper 
+tool for lead\node_modules\tailwindcss\dis
+t\lib.js:3:1733)][0m
+    [2m[at _ (D:\website\web scraper 
+tool for lead\node_modules\tailwindcss\dis
+t\lib.js:3:1377)][0m
+    [2m[at Te (D:\website\web scraper 
+tool for lead\node_modules\tailwindcss\dis
+t\lib.js:21:172)][0m
+    [2m[at pn (D:\website\web scraper 
+tool for lead\node_modules\tailwindcss\dis
+t\lib.js:38:294)][0m
+    [2m[at async dn (D:\website\web 
+scraper tool for lead\node_modules\tailwin
+dcss\dist\lib.js:38:631)][0m
+    [2m[at async Xr (D:\website\web 
+scraper tool for lead\node_modules\@tailwi
+ndcss\node\dist\index.js:10:3417)][0m
+    [2m[at async N (D:\website\web 
+scraper tool for lead\node_modules\@tailwi
+ndcss\postcss\dist\index.js:10:3979)][0m
+
+> Build error occurred
+Error: Turbopack build failed with 1 
+errors:
+./src/app/globals.css
+Error evaluating Node.js code
+CssSyntaxError: tailwindcss: 
+D:\website\web scraper tool for 
+lead\src\app\globals.css:1:1: Cannot 
+apply unknown utility class `bg-[hsl(0,`
+    at Input.error (node_modules/postcss/l
+ib/input.js:135:16) [D:\website\web 
+scraper tool for lead\.next\build\chunks\n
+ode_modules_fe693df6._.js:4651:22]
+    at Root.error 
+(node_modules/postcss/lib/node.js:146:32) 
+[D:\website\web scraper tool for lead\.nex
+t\build\chunks\node_modules_fe693df6._.js:
+928:38]
+    [at Object.Once (D:\website\web 
+scraper tool for lead\node_modules\@tailwi
+ndcss\postcss\dist\index.js:10:6913)]
+    at async LazyResult.runAsync (node_mod
+ules/postcss/lib/lazy-result.js:293:11) 
+[D:\website\web scraper tool for lead\.nex
+t\build\chunks\node_modules_fe693df6._.js:
+6206:21]
+    at async transform (turbopack:///[turb
+opack-node]/transforms/postcss.ts:70:34) 
+[D:\website\web scraper tool for lead\.nex
+t\build\chunks\[root-of-the-server]__51225
+daf._.js:146:36]
+    at async run (turbopack:///[turbopack-
+node]/ipc/evaluate.ts:92:23) 
+[D:\website\web scraper tool for lead\.nex
+t\build\chunks\[root-of-the-server]__97494
+1ed._.js:443:31]
+
+Import trace:
+  Client Component Browser:
+    ./src/app/globals.css [Client 
+Component Browser]
+    ./src/app/layout.tsx [Server 
+Component]
+
+
+    at async transform (turbopack:///[turb
+opack-node]/transforms/postcss.ts:70:34) 
+[D:\website\web scraper tool for lead\.nex
+t\build\chunks\[root-of-the-server]__51225
+daf._.js:146:36])
+    at async run (turbopack:///[turbopack-
+node]/ipc/evaluate.ts:92:23) 
+[D:\website\web scraper tool for lead\.nex
+t\build\chunks\[root-of-the-server]__97494
+1ed._.js:443:31])

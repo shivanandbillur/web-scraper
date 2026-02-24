@@ -54,6 +54,10 @@ export default function Home() {
             setNaturalQuery={engine.setNaturalQuery}
             numResults={engine.numResults}
             setNumResults={engine.setNumResults}
+            enableDynamicExclusions={engine.enableDynamicExclusions}
+            setEnableDynamicExclusions={engine.setEnableDynamicExclusions}
+            manualExclusionsText={engine.manualExclusionsText}
+            setManualExclusionsText={engine.setManualExclusionsText}
             isRunning={engine.isRunning}
             onStart={engine.startScraping}
             onStop={engine.stopScraping}
