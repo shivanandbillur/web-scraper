@@ -8,6 +8,7 @@ import TerminalPanel from "@/components/leads/TerminalPanel";
 import DataTable from "@/components/leads/DataTable";
 import StatsBar from "@/components/leads/StatsBar";
 import SettingsPanel from "@/components/leads/SettingsPanel";
+import InfoModal from "@/components/leads/InfoModal";
 import { useLeadEngine } from "@/hooks/useLeadEngine";
 
 export default function Home() {
@@ -35,12 +36,15 @@ export default function Home() {
           </div>
         </div>
 
-        <SettingsPanel
-          settings={engine.settings}
-          setSettings={engine.setSettings}
-          onClearLogs={engine.clearLogs}
-          onClearAllData={engine.clearAllData}
-        />
+        <div className="flex items-center gap-2">
+          <InfoModal />
+          <SettingsPanel
+            settings={engine.settings}
+            setSettings={engine.setSettings}
+            onClearLogs={engine.clearLogs}
+            onClearAllData={engine.clearAllData}
+          />
+        </div>
       </motion.header>
 
       {/* Stats */}
