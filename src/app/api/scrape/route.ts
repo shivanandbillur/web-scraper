@@ -49,9 +49,14 @@ export async function POST(req: Request) {
           try {
             const clean = url.split('?')[0].replace(/\/$/, "").toLowerCase();
             const parts = clean.split('/in/');
-            if (parts.length > 1) return parts[1];
+            if (parts.length > 1) return parts[1].split(/[ \/]/)[0]; // handle spaces at the end
             const pubParts = clean.split('/pub/');
-            if (pubParts.length > 1) return pubParts[1];
+            if (pubParts.length > 1) return pubParts[1].split(/[ \/]/)[0];
+
+            // Handle weird pasted formats like "ca.linkedin.com › in › yogesh-babu..."
+            const match = clean.match(/›\s*in\s*›\s*([^\s\/"?',|]+)/i);
+            if (match && match[1]) return match[1].trim();
+
             return clean;
           } catch { return url; }
         };
@@ -96,17 +101,18 @@ export async function POST(req: Request) {
           Your goal is to understand their Ideal Customer Profile (ICP). 
           
           User Request: "${query.replace(/"/g, '')}"
-          Location Scope: "India" (If the user doesn't mention specific locations, assume India).
+          Location Scope: "India" (STRICTLY INDIA ONLY. You MUST generate search queries targeting India ONLY).
           
           You must generate:
           1. Exactly 3 novel Google/Yahoo X-Ray search query strings to find these leads. Each query must start with: site:linkedin.com/in/
              - Use OR blocks for synonyms.
+             - Add "India" and aggressive location negative matches (e.g., -"USA" -"United States" -"Canada" -"UK") to ensure ONLY profiles in India are fetched.
 ${promptParts.p1}${promptParts.p2}          
           CRITICAL: AVOID generating these specific queries that were already searched recently: ${JSON.stringify(previousQueries)}
           
           Return a JSON object strictly matching this format:
           {
-            "queries": ["site:linkedin.com/in/...", "site:linkedin.com/in/..."]${promptParts.p3}          }
+            "queries": ["site:linkedin.com/in/... \"India\" -\"USA\"", "site:linkedin.com/in/..."]${promptParts.p3}          }
           DO NOT include markdown block formatting. Return the raw valid JSON ONLY.
           `;
 
@@ -194,7 +200,14 @@ ${promptParts.p1}${promptParts.p2}
                 return { url, name, title, company, bio: descText };
               })
                 .filter(item => item.url.startsWith('http'))
-                .filter(item => item.url.includes('linkedin.com/in') || item.url.includes('linkedin.com/pub'));
+                .filter(item => {
+                  const urlStr = item.url.toLowerCase();
+                  // Strictly enforce Indian or generic linkedin dot com domains, reject subdomains like ca.linkedin.com or uk.linkedin.com unless it's in.linkedin.com
+                  const isForeignDomain = urlStr.match(/https?:\/\/(?!in\.)[a-z]{2,3}\.linkedin\.com\//);
+                  if (isForeignDomain) return false;
+
+                  return urlStr.includes('linkedin.com/in') || urlStr.includes('linkedin.com/pub');
+                });
             });
 
             if (urlsFromPage.length === 0) {
@@ -220,6 +233,12 @@ ${promptParts.p1}${promptParts.p2}
               }
 
               if (!collectedLeads.some(l => l.url.toLowerCase().includes(cleanUrl)) && !exclusionSet.has(profileHandle) && !exclusionSet.has(cleanUrl)) {
+                // Validate location strictly for India
+                if (fullTextCheck.match(/\b(united states|usa|canada|uk|united kingdom|australia|germany|france|singapore|dubai|uae)\b/i)) {
+                  sendUpdate('log', `Filtered out non-India lead: ${rawLead.name || profileHandle}`);
+                  continue;
+                }
+
                 if (rawLead.name === "Sign Up | LinkedIn") rawLead.name = "Unknown";
 
                 const extractedItem = {

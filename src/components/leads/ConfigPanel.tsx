@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Pencil, Database, FileSpreadsheet, Play, Square, History } from "lucide-react";
+import { Pencil, Database, FileSpreadsheet, Play, Square, History, Upload } from "lucide-react";
 import QueryHistoryModal from "./QueryHistoryModal";
+import * as XLSX from "xlsx";
 
 type Props = {
   naturalQuery: string;
@@ -41,6 +42,48 @@ const ConfigPanel = ({
     }
     fetchSuggestions();
   }, []);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = evt.target?.result;
+        const workbook = XLSX.read(data, { type: 'array' });
+        let fullText = "";
+        workbook.SheetNames.forEach(sheetName => {
+          const xlRowData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+          fullText += xlRowData.map(row => (row as any[]).join(" ")).join("\n") + "\n";
+        });
+
+        const matches = fullText.match(/(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin\.com(?:\/in\/|\s*›\s*in\s*›\s*)([^\s\/"?',|]+)/gi);
+        if (matches) {
+          const handles = matches.map(m => {
+            const parts = m.split(/in[\/›\s]+/);
+            return parts.length > 1 ? `https://linkedin.com/in/${parts.pop()?.trim()}` : '';
+          }).filter(Boolean);
+
+          if (handles.length > 0) {
+            const unique = Array.from(new Set(handles));
+            setManualExclusionsText((prev: string) => prev + (prev ? '\n' : '') + unique.join('\n'));
+            alert(`Extracted ${unique.length} valid LinkedIn profiles from the file.`);
+          } else {
+            alert("No valid LinkedIn profile URLs found in the file.");
+          }
+        } else {
+          alert("No valid LinkedIn profile URLs found in the file.");
+        }
+      } catch (err) {
+        console.error("Error parsing file", err);
+        alert("Failed to parse the file.");
+      }
+      e.target.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   return (
     <>
       <motion.div
@@ -114,9 +157,15 @@ const ConfigPanel = ({
           </div>
 
           <div>
-            <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-2 block">
-              Manual Exclusions (URLs)
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest block">
+                Manual Exclusions (URLs)
+              </label>
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest border border-border px-2 py-1 rounded bg-muted/50 hover:bg-muted cursor-pointer flex items-center gap-1 transition-colors">
+                <Upload className="w-3 h-3" /> Upload CSV/XLSX
+                <input type="file" accept=".csv, .xlsx, .xls" className="hidden" onChange={handleFileUpload} />
+              </label>
+            </div>
             <textarea
               value={manualExclusionsText}
               onChange={e => setManualExclusionsText(e.target.value)}
