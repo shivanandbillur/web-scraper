@@ -36,15 +36,6 @@ export async function POST(req: Request) {
         sendUpdate('log', `Reading exclusion list from Database and leadsc - sheet1 (1).csv...`);
         const exclusionSet = new Set<string>();
 
-        const csvPath = path.join(process.cwd(), 'leadsc - sheet1 (1).csv');
-        if (fs.existsSync(csvPath)) {
-          const fileContent = fs.readFileSync(csvPath, 'utf-8');
-          const matches = fileContent.match(/https?:\/\/[a-z]{0,3}\.?linkedin\.com\/in\/[^\s",]+/gi);
-          if (matches) {
-            matches.forEach(m => exclusionSet.add(m.split('?')[0].replace(/\/$/, "").toLowerCase()));
-          }
-        }
-
         const getHandle = (url: string) => {
           try {
             const clean = url.split('?')[0].replace(/\/$/, "").toLowerCase();
@@ -60,6 +51,19 @@ export async function POST(req: Request) {
             return clean;
           } catch { return url; }
         };
+
+        const csvPath = path.join(process.cwd(), 'leadsc - sheet1 (1).csv');
+        if (fs.existsSync(csvPath)) {
+          const fileContent = fs.readFileSync(csvPath, 'utf-8');
+          const matches = fileContent.match(/https?:\/\/[a-z]{0,3}\.?linkedin\.com\/in\/[^\s",]+/gi);
+          if (matches) {
+            matches.forEach(m => {
+              const cleanUrl = m.split('?')[0].replace(/\/$/, "").toLowerCase();
+              exclusionSet.add(cleanUrl);
+              exclusionSet.add(getHandle(cleanUrl));
+            });
+          }
+        }
 
         // Also fetch any existing leads from the SQLite database
         const dbLeads = db.prepare('SELECT url FROM leads').all();
