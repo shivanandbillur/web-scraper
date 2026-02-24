@@ -8,9 +8,10 @@ type Props = {
   isRunning: boolean;
   extractedCount?: number;
   targetCount?: number;
+  runStats?: { rawLeadsFound: number; currentQuery: number; totalQueries: number; };
 };
 
-const TerminalPanel = ({ logs, isRunning, extractedCount, targetCount }: Props) => {
+const TerminalPanel = ({ logs, isRunning, extractedCount, targetCount, runStats }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,13 +45,23 @@ const TerminalPanel = ({ logs, isRunning, extractedCount, targetCount }: Props) 
           <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Terminal</h2>
         </div>
         {isRunning && (
-          <div className="flex items-center gap-2">
-            {targetCount !== undefined && extractedCount !== undefined && (
-              <span className="text-[10px] text-foreground/80 font-medium tracking-wide">
-                (Goal: {extractedCount}/{targetCount})
+          <div className="flex flex-wrap items-center gap-2">
+            {runStats && runStats.totalQueries > 0 && (
+              <span className="text-[10px] text-muted-foreground font-medium tracking-wide">
+                Queries: {runStats.currentQuery}/{runStats.totalQueries}
               </span>
             )}
-            <div className="w-2 h-2 bg-foreground animate-pulse" />
+            {runStats !== undefined && (
+              <span className="text-[10px] text-yellow-500 font-medium tracking-wide">
+                Scanned: {runStats.rawLeadsFound}
+              </span>
+            )}
+            {targetCount !== undefined && extractedCount !== undefined && (
+              <span className="text-[10px] text-green-500 font-bold tracking-wide">
+                Goal: {extractedCount}/{targetCount}
+              </span>
+            )}
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-1" />
             <span className="text-[10px] text-foreground font-medium uppercase tracking-widest">Live</span>
           </div>
         )}

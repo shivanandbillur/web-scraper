@@ -82,6 +82,7 @@ export async function POST(req: Request) {
         const page = await context.newPage();
 
         let collectedLeads: any[] = [];
+        let totalScrapedRawLeads = 0;
         const openai = new OpenAI({ apiKey: openAiKey });
 
         while (collectedLeads.length < targetCount) {
@@ -208,6 +209,13 @@ ${promptParts.p1}${promptParts.p2}
 
                   return urlStr.includes('linkedin.com/in') || urlStr.includes('linkedin.com/pub');
                 });
+            });
+
+            totalScrapedRawLeads += urlsFromPage.length;
+            sendUpdate('stats', {
+              rawLeadsFound: totalScrapedRawLeads,
+              currentQuery: queryIndex + 1,
+              totalQueries: generatedQueries.length
             });
 
             if (urlsFromPage.length === 0) {

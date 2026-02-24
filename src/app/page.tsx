@@ -76,6 +76,7 @@ export default function Home() {
             isRunning={engine.isRunning}
             extractedCount={engine.activeList?.leads?.length || 0}
             targetCount={engine.numResults}
+            runStats={engine.runStats}
           />
         </div>
 

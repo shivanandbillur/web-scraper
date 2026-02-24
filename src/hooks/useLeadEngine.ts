@@ -33,6 +33,7 @@ export function useLeadEngine() {
   const [lists, setLists] = useState<LeadList[]>([]);
   const [currentListId, setCurrentListId] = useState<string | null>(null);
   const [settings, setSettings] = useState<EngineSettings>(defaultSettings);
+  const [runStats, setRunStats] = useState({ rawLeadsFound: 0, currentQuery: 0, totalQueries: 0 });
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -118,6 +119,7 @@ export function useLeadEngine() {
     abortControllerRef.current = new AbortController();
 
     setIsRunning(true);
+    setRunStats({ rawLeadsFound: 0, currentQuery: 0, totalQueries: 0 });
     setLogs([{ time: new Date().toLocaleTimeString(), message: "Starting lead generation engine..." }]);
 
     const newListId = uuidv4();
@@ -178,6 +180,8 @@ export function useLeadEngine() {
                 } else if (data.type === "done") {
                   addLog("Job complete!", "success");
                   setIsRunning(false);
+                } else if (data.type === "stats") {
+                  setRunStats(data.data);
                 }
               } catch { }
             }
@@ -251,6 +255,7 @@ export function useLeadEngine() {
     enableDynamicExclusions, setEnableDynamicExclusions,
     manualExclusionsText, setManualExclusionsText,
     isRunning,
+    runStats,
     logs,
     lists,
     currentListId, setCurrentListId,

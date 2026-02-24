@@ -67,7 +67,7 @@ const ConfigPanel = ({
 
           if (handles.length > 0) {
             const unique = Array.from(new Set(handles));
-            setManualExclusionsText((prev: string) => prev + (prev ? '\n' : '') + unique.join('\n'));
+            setManualExclusionsText(manualExclusionsText + (manualExclusionsText ? '\n' : '') + unique.join('\n'));
             alert(`Extracted ${unique.length} valid LinkedIn profiles from the file.`);
           } else {
             alert("No valid LinkedIn profile URLs found in the file.");
@@ -142,17 +142,27 @@ const ConfigPanel = ({
             />
           </div>
 
-          <div className="flex items-center gap-3 bg-muted/30 p-3 border border-border">
-            <input
-              type="checkbox"
-              checked={enableDynamicExclusions}
-              onChange={e => setEnableDynamicExclusions(e.target.checked)}
-              className="w-4 h-4 cursor-pointer"
-              id="dynamic-exclusions"
-            />
-            <div className="flex flex-col">
-              <label htmlFor="dynamic-exclusions" className="text-xs font-semibold cursor-pointer">AI Dynamic Exclusions</label>
-              <p className="text-[10px] text-muted-foreground">Auto-infer and exclude anti-persona leads</p>
+          <div className="flex flex-col gap-3 bg-muted/30 p-3 border border-border">
+            <div className="flex items-center gap-2 border-b border-border/50 pb-2">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-foreground">Native Exclusions Active</span>
+                <span className="text-[10px] text-muted-foreground">Always blocking old queries, database duplicates & leadsc - sheet1 (1).csv</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={enableDynamicExclusions}
+                onChange={e => setEnableDynamicExclusions(e.target.checked)}
+                className="w-4 h-4 cursor-pointer"
+                id="dynamic-exclusions"
+              />
+              <div className="flex flex-col">
+                <label htmlFor="dynamic-exclusions" className="text-xs font-semibold cursor-pointer">Semantic & Anti-Persona Filter Generator</label>
+                <p className="text-[10px] text-muted-foreground">AI explicitly negates irrelevant roles and reads bios to block those outside ICP target.</p>
+              </div>
             </div>
           </div>
 
