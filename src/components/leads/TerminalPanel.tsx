@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Terminal } from "lucide-react";
 import type { LogEntry } from "@/types/leads";
@@ -13,12 +13,34 @@ type Props = {
 
 const TerminalPanel = ({ logs, isRunning, extractedCount, targetCount, runStats }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    let interval: any;
+    if (isRunning) {
+      interval = setInterval(() => setElapsed(prev => prev + 1), 1000);
+    } else {
+      setElapsed(0);
+    }
+    return () => clearInterval(interval);
+  }, [isRunning]);
 
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [logs]);
+
+  const getAiState = () => {
+    if (!isRunning) return { emoji: "😴", text: "Idle", color: "text-muted-foreground" };
+    const rate = extractedCount ? (elapsed / extractedCount) : elapsed;
+    if (rate > 25) return { emoji: "🥵", text: "Struggling...", color: "text-red-500" };
+    if (rate > 15) return { emoji: "🤔", text: "Thinking...", color: "text-yellow-500" };
+    if (extractedCount && extractedCount > 5) return { emoji: "🤓", text: "In the zone!", color: "text-green-500" };
+    return { emoji: "🤖", text: "Searching...", color: "text-foreground" };
+  };
+
+  const aiLogic = getAiState();
 
   const getLogColor = (log: LogEntry) => {
     if (log.type === 'error') return 'text-muted-foreground';
@@ -46,16 +68,26 @@ const TerminalPanel = ({ logs, isRunning, extractedCount, targetCount, runStats 
         </div>
         {isRunning && (
           <div className="flex flex-wrap items-center gap-2">
-            {runStats && runStats.totalQueries > 0 && (
-              <span className="text-[10px] text-muted-foreground font-medium tracking-wide">
-                Queries: {runStats.currentQuery}/{runStats.totalQueries}
-              </span>
-            )}
+            <span className={`text-[10px] font-bold tracking-widest uppercase ${aiLogic.color}`}>
+              {aiLogic.emoji} {aiLogic.text}
+            </span>
+            <span className="text-muted-foreground text-[10px]">|</span>
             {runStats !== undefined && (
               <span className="text-[10px] text-yellow-500 font-medium tracking-wide">
                 Scanned: {runStats.rawLeadsFound}
               </span>
             )}
+            {runStats !== undefined && extractedCount !== undefined && (
+              <span className="text-[10px] text-red-500 font-medium tracking-wide">
+                Rejected: {Math.max(0, runStats.rawLeadsFound - extractedCount)}
+              </span>
+            )}
+            {runStats && runStats.totalQueries > 0 && (
+              <span className="text-[10px] text-muted-foreground font-medium tracking-wide">
+                (Query {runStats.currentQuery}/{runStats.totalQueries})
+              </span>
+            )}
+            <span className="text-muted-foreground text-[10px]">|</span>
             {targetCount !== undefined && extractedCount !== undefined && (
               <span className="text-[10px] text-green-500 font-bold tracking-wide">
                 Goal: {extractedCount}/{targetCount}
