@@ -151,6 +151,11 @@ ${promptParts.p1}${promptParts.p2}
           let queryIndex = 0;
 
           while (collectedLeads.length < targetCount && queryIndex < generatedQueries.length) {
+            if (req.signal.aborted) {
+              sendUpdate('log', 'User terminated connection. Stopping search safely.');
+              break;
+            }
+
             const activeSearchTerm = generatedQueries[queryIndex];
 
             // Verify we haven't run this query already
@@ -178,7 +183,10 @@ ${promptParts.p1}${promptParts.p2}
               return Array.from(rows).map(row => {
                 const a = row.querySelector('a');
                 const url = a ? a.href : '';
-                const titleText = a ? a.innerText : '';
+                const titleTextRaw = a ? a.innerText : '';
+                const titleLines = titleTextRaw.split('\n');
+                const titleText = titleLines[titleLines.length - 1] || '';
+
                 const parent = row.parentElement;
                 const descNode = parent?.querySelector('.compText');
                 const descText = descNode ? (descNode as HTMLElement).innerText : '';
@@ -227,6 +235,8 @@ ${promptParts.p1}${promptParts.p2}
 
             let added = 0;
             for (const rawLead of urlsFromPage) {
+              if (req.signal.aborted) break;
+
               const fullTextCheck = `${rawLead.name} ${rawLead.title} ${rawLead.company} ${rawLead.bio}`.toLowerCase();
               const cleanUrl = rawLead.url.split('?')[0].replace(/\/$/, "").toLowerCase();
               const profileHandle = getHandle(cleanUrl);
