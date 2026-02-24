@@ -21,7 +21,7 @@ export async function POST(req: Request) {
       let browser = null;
       try {
         const payload = await req.json();
-        const { query, numResults = 10 } = payload;
+        const { query, numResults = 10, enableDynamicExclusions = true, manualExclusions = [] } = payload;
 
         const openAiKey = process.env.OPENAI_API_KEY;
         if (!openAiKey) {
@@ -45,9 +45,27 @@ export async function POST(req: Request) {
           }
         }
 
+        const getHandle = (url: string) => {
+          try {
+            const clean = url.split('?')[0].replace(/\/$/, "").toLowerCase();
+            const parts = clean.split('/in/');
+            if (parts.length > 1) return parts[1];
+            const pubParts = clean.split('/pub/');
+            if (pubParts.length > 1) return pubParts[1];
+            return clean;
+          } catch { return url; }
+        };
+
         // Also fetch any existing leads from the SQLite database
         const dbLeads = db.prepare('SELECT url FROM leads').all();
-        dbLeads.forEach((l: any) => exclusionSet.add(l.url.toLowerCase()));
+        dbLeads.forEach((l: any) => exclusionSet.add(getHandle(l.url)));
+
+        if (Array.isArray(manualExclusions) && manualExclusions.length > 0) {
+          manualExclusions.forEach(url => {
+            if (url) exclusionSet.add(getHandle(url));
+          });
+          sendUpdate('log', `Added ${manualExclusions.length} manual exclusions.`);
+        }
 
         sendUpdate('log', `Loaded a total of ${exclusionSet.size} unique URLs into the Exclusion Filter.`);
 
@@ -67,22 +85,29 @@ export async function POST(req: Request) {
           const prevQueriesRaw = db.prepare('SELECT query_text FROM queries').all();
           const previousQueries = prevQueriesRaw.map((q: any) => q.query_text);
 
+          const promptParts = {
+            p1: enableDynamicExclusions ? "             - Add minus operators (-word) in the query itself to exclude unwanted profiles matching the anti-persona.\n" : "",
+            p2: enableDynamicExclusions ? "          2. A list of negative keywords/phrases to filter out unwanted profiles post-search. For example, if the user is looking for Brands/Clients for BTL marketing, exclude vendors: [\"agency\", \"event management\", \"event planner\"]. If they are looking for SaaS influencers, maybe exclude: [\"intern\", \"student\", \"fresher\"].\n" : "",
+            p3: enableDynamicExclusions ? "            ,\n            \"exclusions\": [\"word1\", \"phrase2\"]\n" : "\n"
+          };
+
           const prompt = `
           The user is looking for LinkedIn profiles based on a natural language intent.
-          Your goal is to output exactly 3 novel Google/Yahoo X-Ray search query strings.
-          The query must begin with: site:linkedin.com/in/
+          Your goal is to understand their Ideal Customer Profile (ICP). 
           
-          User Request: "${query}"
-          Location Scope: "India" (defaulting to India. Only include people in India).
+          User Request: "${query.replace(/"/g, '')}"
+          Location Scope: "India" (If the user doesn't mention specific locations, assume India).
           
-          Rules for Offline Marketing:
-          - If the user wants offline marketers or BTL managers, INCLUDE people working AT brands/companies.
-          - EXCLUDE people working at marketing agencies or ad agencies (use: -agency -"marketing agency" -"ad agency" etc).
-          - Be creative with synonyms (e.g. "Below the line", "Experiential", "BTL").
-          - CRITICAL: AVOID generating queries exactly matching these previous ones: ${JSON.stringify(previousQueries).substring(0, 1500)}...
+          You must generate:
+          1. Exactly 3 novel Google/Yahoo X-Ray search query strings to find these leads. Each query must start with: site:linkedin.com/in/
+             - Use OR blocks for synonyms.
+${promptParts.p1}${promptParts.p2}          
+          CRITICAL: AVOID generating these specific queries that were already searched recently: ${JSON.stringify(previousQueries)}
           
-          Provide the 3 queries in a clean JSON string array [ "site:... ", "site:... "].
-          DO NOT include markdown block formatting, text wrappers, or any conversational text. Return the raw valid JSON array ONLY.
+          Return a JSON object strictly matching this format:
+          {
+            "queries": ["site:linkedin.com/in/...", "site:linkedin.com/in/..."]${promptParts.p3}          }
+          DO NOT include markdown block formatting. Return the raw valid JSON ONLY.
           `;
 
           const aiRes = await openai.chat.completions.create({
@@ -91,14 +116,25 @@ export async function POST(req: Request) {
             temperature: 0.9 // High temperature for diverse query structures 
           });
 
-          let generatedQueries = [];
+          let generatedQueries: string[] = [];
+          let dynamicExclusions: string[] = [];
+
           try {
-            const text = aiRes.choices[0].message.content || '[]';
-            generatedQueries = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
-            if (!Array.isArray(generatedQueries) || generatedQueries.length === 0) throw new Error("empty");
+            const text = aiRes.choices[0].message.content || '{}';
+            const parsed = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+
+            if (Array.isArray(parsed)) {
+              generatedQueries = parsed;
+            } else if (parsed && parsed.queries && Array.isArray(parsed.queries)) {
+              generatedQueries = parsed.queries;
+              dynamicExclusions = Array.isArray(parsed.exclusions) ? parsed.exclusions : [];
+            } else {
+              throw new Error("Invalid structure");
+            }
           } catch {
             sendUpdate('log', `Failed to parse AI response natively. Creating fallback query.`);
-            generatedQueries = [`site:linkedin.com/in/ "${query}" "India" -agency`];
+            generatedQueries = [`site:linkedin.com/in/ "${query}" "India"`];
+            dynamicExclusions = [];
           }
 
           sendUpdate('ai_queries', generatedQueries);
@@ -170,9 +206,20 @@ export async function POST(req: Request) {
 
             let added = 0;
             for (const rawLead of urlsFromPage) {
+              const fullTextCheck = `${rawLead.name} ${rawLead.title} ${rawLead.company} ${rawLead.bio}`.toLowerCase();
               const cleanUrl = rawLead.url.split('?')[0].replace(/\/$/, "").toLowerCase();
+              const profileHandle = getHandle(cleanUrl);
 
-              if (!collectedLeads.some(l => l.url.toLowerCase().includes(cleanUrl)) && !exclusionSet.has(cleanUrl)) {
+              if (enableDynamicExclusions && dynamicExclusions && dynamicExclusions.length > 0) {
+                const safeExclusions = dynamicExclusions.map((e: string) => e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+                const exclusionRegex = new RegExp(`\\b(${safeExclusions.join('|')})\\b`, 'i');
+                if (exclusionRegex.test(fullTextCheck)) {
+                  sendUpdate('log', `Filtered out anti-persona lead dynamically: ${rawLead.name || profileHandle}`);
+                  continue;
+                }
+              }
+
+              if (!collectedLeads.some(l => l.url.toLowerCase().includes(cleanUrl)) && !exclusionSet.has(profileHandle) && !exclusionSet.has(cleanUrl)) {
                 if (rawLead.name === "Sign Up | LinkedIn") rawLead.name = "Unknown";
 
                 const extractedItem = {
