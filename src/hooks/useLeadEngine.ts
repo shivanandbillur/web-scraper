@@ -28,12 +28,15 @@ export function useLeadEngine() {
   const [numResults, setNumResults] = useState(10);
   const [enableDynamicExclusions, setEnableDynamicExclusions] = useState(true);
   const [manualExclusionsText, setManualExclusionsText] = useState("");
+  const [spendLimit, setSpendLimit] = useState<number>(0.5); // Default $0.50 per session limit
+  const [currentSpend, setCurrentSpend] = useState<number>(0);
+  const [allTimeCost, setAllTimeCost] = useState<number>(0);
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [lists, setLists] = useState<LeadList[]>([]);
   const [currentListId, setCurrentListId] = useState<string | null>(null);
   const [settings, setSettings] = useState<EngineSettings>(defaultSettings);
-  const [runStats, setRunStats] = useState({ rawLeadsFound: 0, currentQuery: 0, totalQueries: 0 });
+  const [runStats, setRunStats] = useState({ rawLeadsFound: 0, rejected: 0, kept: 0 });
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -119,7 +122,8 @@ export function useLeadEngine() {
     abortControllerRef.current = new AbortController();
 
     setIsRunning(true);
-    setRunStats({ rawLeadsFound: 0, currentQuery: 0, totalQueries: 0 });
+    setCurrentSpend(0);
+    setRunStats({ rawLeadsFound: 0, rejected: 0, kept: 0 });
     setLogs([{ time: new Date().toLocaleTimeString(), message: "Starting lead generation engine..." }]);
 
     const newListId = uuidv4();
@@ -128,6 +132,12 @@ export function useLeadEngine() {
       name: `${naturalQuery.substring(0, 30) || "Lead Search"} - ${new Date().toLocaleDateString()}`,
       date: new Date().toISOString(),
       leads: [],
+      prompt: naturalQuery,
+      targetCount: numResults,
+      costSpent: 0,
+      scanned: 0,
+      rejected: 0,
+      status: 'running',
     };
 
     setLists((prev) => [newList, ...prev]);
@@ -141,6 +151,7 @@ export function useLeadEngine() {
           query: naturalQuery,
           numResults,
           enableDynamicExclusions,
+          spendLimit,
           manualExclusions: manualExclusionsText.split('\n').map(s => s.trim()).filter(Boolean)
         }),
         signal: abortControllerRef.current.signal,
@@ -180,8 +191,33 @@ export function useLeadEngine() {
                 } else if (data.type === "done") {
                   addLog("Job complete!", "success");
                   setIsRunning(false);
+                  setLists((prev) => prev.map((l) =>
+                    l.id === newListId ? { ...l, status: 'done' } : l
+                  ));
                 } else if (data.type === "stats") {
-                  setRunStats(data.data);
+                  const s = data.data;
+                  setRunStats({
+                    rawLeadsFound: s.rawLeadsFound ?? 0,
+                    rejected: s.rejected ?? 0,
+                    kept: s.kept ?? 0,
+                  });
+                  // Persist live stats to the list
+                  setLists((prev) => prev.map((l) =>
+                    l.id === newListId
+                      ? { ...l, scanned: s.rawLeadsFound ?? 0, rejected: s.rejected ?? 0 }
+                      : l
+                  ));
+                } else if (data.type === "cost_update") {
+                  setCurrentSpend(data.data.totalCost);
+                  if (data.data.allTimeCost !== undefined) {
+                    setAllTimeCost(data.data.allTimeCost);
+                  }
+                  // Persist cost live to the list
+                  setLists((prev) => prev.map((l) =>
+                    l.id === newListId
+                      ? { ...l, costSpent: data.data.totalCost, allTimeCostAtEnd: data.data.allTimeCost }
+                      : l
+                  ));
                 }
               } catch { }
             }
@@ -196,7 +232,7 @@ export function useLeadEngine() {
         simulateDemo(newListId);
       }
     }
-  }, [naturalQuery, numResults, enableDynamicExclusions, manualExclusionsText, addLog, simulateDemo]);
+  }, [naturalQuery, numResults, enableDynamicExclusions, manualExclusionsText, spendLimit, addLog, simulateDemo]);
 
   const stopScraping = useCallback(() => {
     setIsRunning(false);
@@ -205,6 +241,10 @@ export function useLeadEngine() {
       abortControllerRef.current = null;
     }
     addLog("Execution stopped by user.", "info");
+    // Mark current list as stopped
+    setLists((prev) => prev.map((l) =>
+      l.status === 'running' ? { ...l, status: 'stopped' } : l
+    ));
   }, [addLog]);
 
   const deleteList = useCallback((id: string) => {
@@ -254,6 +294,9 @@ export function useLeadEngine() {
     numResults, setNumResults,
     enableDynamicExclusions, setEnableDynamicExclusions,
     manualExclusionsText, setManualExclusionsText,
+    spendLimit, setSpendLimit,
+    currentSpend, setCurrentSpend,
+    allTimeCost,
     isRunning,
     runStats,
     logs,

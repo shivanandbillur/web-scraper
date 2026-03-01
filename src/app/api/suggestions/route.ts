@@ -14,8 +14,6 @@ export async function GET() {
         const prevQueriesRaw = db.prepare('SELECT query_text FROM queries ORDER BY id DESC LIMIT 15').all();
         const previousQueries = prevQueriesRaw.map((q: any) => q.query_text);
 
-        const openai = new OpenAI({ apiKey: openAiKey });
-
         const prompt = `
     You are an AI assistant in a LinkedIn Lead Generation Tool for B2B marketers.
     Your task is to suggest 3 fresh, varied, natural language search intents for the user to try.
@@ -32,11 +30,17 @@ export async function GET() {
     Output ONLY a raw JSON array of 3 strings. NO markdown, NO conversational text.
     `;
 
-        const aiRes = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.8
-        });
+        let aiRes;
+        try {
+            const openai = new OpenAI({ apiKey: openAiKey });
+            aiRes = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [{ role: "system", content: "You output distinct JSON array of strings." }, { role: "user", content: prompt }],
+                temperature: 0.9
+            });
+        } catch (err) {
+            throw err;
+        }
 
         let suggestions = [];
         try {

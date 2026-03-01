@@ -17,6 +17,14 @@ export type LeadList = {
   name: string;
   date: string;
   leads: LeadItem[];
+  // Session metadata — saved live during / after execution
+  prompt?: string;
+  costSpent?: number;
+  allTimeCostAtEnd?: number;
+  scanned?: number;
+  rejected?: number;
+  targetCount?: number;
+  status?: 'running' | 'done' | 'stopped';
 };
 
 export type LogEntry = {

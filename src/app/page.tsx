@@ -50,9 +50,11 @@ export default function Home() {
       {/* Stats */}
       <StatsBar lists={engine.lists} activeList={engine.activeList} isRunning={engine.isRunning} />
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-[600px]">
-        <div className="lg:col-span-3 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
+      {/* Main Grid — all columns fixed-height, no overflow push */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4" style={{ height: 'calc(100vh - 180px)', minHeight: '640px' }}>
+
+        {/* Left: Config + History — scrollable column */}
+        <div className="lg:col-span-3 flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-0.5">
           <ConfigPanel
             naturalQuery={engine.naturalQuery}
             setNaturalQuery={engine.setNaturalQuery}
@@ -62,10 +64,15 @@ export default function Home() {
             setEnableDynamicExclusions={engine.setEnableDynamicExclusions}
             manualExclusionsText={engine.manualExclusionsText}
             setManualExclusionsText={engine.setManualExclusionsText}
+            spendLimit={engine.spendLimit}
+            setSpendLimit={engine.setSpendLimit}
+            currentSpend={engine.currentSpend}
+            allTimeCost={engine.allTimeCost}
             isRunning={engine.isRunning}
             onStart={engine.startScraping}
             onStop={engine.stopScraping}
           />
+          {/* History panel — fixed-height box, scrolls internally */}
           <HistoryPanel
             lists={engine.lists}
             currentListId={engine.currentListId}
@@ -74,7 +81,8 @@ export default function Home() {
           />
         </div>
 
-        <div className="lg:col-span-3">
+        {/* Middle: Terminal — fixed height */}
+        <div className="lg:col-span-3 overflow-hidden">
           <TerminalPanel
             logs={engine.logs}
             isRunning={engine.isRunning}
@@ -84,7 +92,8 @@ export default function Home() {
           />
         </div>
 
-        <div className="lg:col-span-6">
+        {/* Right: Data Table — fixed height, scrolls internally */}
+        <div className="lg:col-span-6 overflow-hidden" style={{ height: '100%' }}>
           <DataTable
             activeList={engine.activeList}
             onDeleteLeads={engine.deleteLeads}

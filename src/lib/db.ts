@@ -13,7 +13,7 @@ db.pragma('journal_mode = WAL');
 db.exec(`
   CREATE TABLE IF NOT EXISTS queries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    query_text TEXT UNIQUE,
+    query_text TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -28,6 +28,42 @@ db.exec(`
     bio TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS cost_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT,
+    prompt_tokens INTEGER,
+    completion_tokens INTEGER,
+    cost_usd REAL,
+    model TEXT DEFAULT 'gpt-4o-mini',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
+
+// Migration: drop UNIQUE index on queries.query_text if it exists (from legacy schema)
+try {
+  db.exec(`DROP INDEX IF EXISTS idx_queries_query_text_unique;`);
+} catch (_) { }
+
+// Also try removing unique constraint by recreating table if needed
+try {
+  const tableInfo = db.prepare("PRAGMA table_info(queries)").all() as any[];
+  // Check the index list
+  const indexes = db.prepare("PRAGMA index_list(queries)").all() as any[];
+  const hasUniqueIndex = indexes.some((idx: any) => idx.unique === 1);
+  if (hasUniqueIndex) {
+    // Recreate queries table without unique constraint
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS queries_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        query_text TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO queries_new (id, query_text, created_at) SELECT id, query_text, created_at FROM queries;
+      DROP TABLE queries;
+      ALTER TABLE queries_new RENAME TO queries;
+    `);
+  }
+} catch (_) { }
 
 export default db;

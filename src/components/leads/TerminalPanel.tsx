@@ -8,7 +8,7 @@ type Props = {
   isRunning: boolean;
   extractedCount?: number;
   targetCount?: number;
-  runStats?: { rawLeadsFound: number; currentQuery: number; totalQueries: number; };
+  runStats?: { rawLeadsFound: number; rejected: number; kept: number; };
 };
 
 const TerminalPanel = ({ logs, isRunning, extractedCount, targetCount, runStats }: Props) => {
@@ -57,7 +57,7 @@ const TerminalPanel = ({ logs, isRunning, extractedCount, targetCount, runStats 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2 }}
-      className="glass-panel p-5 flex flex-col gap-4 h-full"
+      className="glass-panel p-5 flex flex-col gap-4 h-full overflow-hidden"
     >
       <div className="flex items-center justify-between pb-2 border-b border-border">
         <div className="flex items-center gap-2">
@@ -77,14 +77,9 @@ const TerminalPanel = ({ logs, isRunning, extractedCount, targetCount, runStats 
                 Scanned: {runStats.rawLeadsFound}
               </span>
             )}
-            {runStats !== undefined && extractedCount !== undefined && (
+            {runStats !== undefined && (
               <span className="text-[10px] text-red-500 font-medium tracking-wide">
-                Rejected: {Math.max(0, runStats.rawLeadsFound - extractedCount)}
-              </span>
-            )}
-            {runStats && runStats.totalQueries > 0 && (
-              <span className="text-[10px] text-muted-foreground font-medium tracking-wide">
-                (Query {runStats.currentQuery}/{runStats.totalQueries})
+                Rejected: {runStats.rejected}
               </span>
             )}
             <span className="text-muted-foreground text-[10px]">|</span>
@@ -99,7 +94,7 @@ const TerminalPanel = ({ logs, isRunning, extractedCount, targetCount, runStats 
         )}
       </div>
 
-      <div ref={containerRef} className="overflow-y-auto font-mono text-xs terminal-bg p-3 custom-scrollbar h-[350px] w-full shrink-0">
+      <div ref={containerRef} className="flex-1 overflow-y-auto font-mono text-xs terminal-bg p-3 custom-scrollbar w-full min-h-0">
         <AnimatePresence>
           {logs.length === 0 ? (
             <p className="text-muted-foreground/50 italic mt-4 text-center text-xs">

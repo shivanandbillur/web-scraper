@@ -13,6 +13,10 @@ type Props = {
   setEnableDynamicExclusions: (v: boolean) => void;
   manualExclusionsText: string;
   setManualExclusionsText: (v: string) => void;
+  spendLimit: number;
+  setSpendLimit: (v: number) => void;
+  currentSpend: number;
+  allTimeCost: number;
   isRunning: boolean;
   onStart: () => void;
   onStop: () => void;
@@ -23,6 +27,9 @@ const ConfigPanel = ({
   numResults, setNumResults,
   enableDynamicExclusions, setEnableDynamicExclusions,
   manualExclusionsText, setManualExclusionsText,
+  spendLimit, setSpendLimit,
+  currentSpend,
+  allTimeCost,
   isRunning, onStart, onStop,
 }: Props) => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -128,18 +135,75 @@ const ConfigPanel = ({
             </div>
           </div>
 
-          <div>
-            <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-2 block">
-              Leads Goal
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={1000}
-              value={numResults}
-              onChange={(e) => setNumResults(Number(e.target.value))}
-              className="input-field w-full px-4 py-3 font-semibold"
-            />
+          {/* ── Primary action — right under the prompt ── */}
+          <button
+            onClick={isRunning ? onStop : onStart}
+            className={`w-full flex items-center justify-center gap-3 py-4 text-sm transition-all duration-300 ${isRunning ? 'btn-danger-glow' : 'btn-primary-glow'}`}
+          >
+            {isRunning ? <Square className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
+            {isRunning ? "STOP" : "GENERATE LEADS"}
+          </button>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-2 block">
+                Leads Goal
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={1000}
+                value={numResults}
+                onChange={(e) => setNumResults(Number(e.target.value))}
+                className="input-field w-full px-4 py-3 font-semibold"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-widest mb-2 flex justify-between items-center">
+                <span>Spend Limit ($)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 items-center justify-center top-3 font-semibold text-muted-foreground">$</span>
+                <input
+                  type="number"
+                  min={0.01}
+                  step={0.01}
+                  value={spendLimit}
+                  onChange={(e) => setSpendLimit(Number(e.target.value))}
+                  className="input-field w-full pl-7 pr-4 py-3 font-semibold"
+                />
+              </div>
+              {/* Cost breakdown — always visible, not just while running */}
+              <div className="mt-2 flex flex-col gap-1 bg-muted/40 border border-border rounded p-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-widest">This Run</span>
+                  <span className={`text-[11px] font-bold tabular-nums ${currentSpend >= spendLimit * 0.9 ? 'text-red-500' : 'text-emerald-500'
+                    } ${isRunning ? 'animate-pulse' : ''}`}>
+                    ${currentSpend.toFixed(5)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-t border-border/50 pt-1">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-widest">All-Time Total</span>
+                  <span className="text-[11px] font-bold tabular-nums text-amber-500">
+                    ${allTimeCost.toFixed(5)}
+                  </span>
+                </div>
+                <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">
+                  ⚠️ OpenAI dashboard shows cumulative cost across ALL runs. &quot;This Run&quot; resets each search.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Compact cost bar ── */}
+          <div className="flex items-center gap-2 px-2 py-1 bg-muted/30 border border-border/50 rounded text-[10px]">
+            <span className="text-muted-foreground">Run</span>
+            <span className={`font-bold tabular-nums ${currentSpend >= spendLimit * 0.9 ? 'text-red-500' : 'text-emerald-500'} ${isRunning ? 'animate-pulse' : ''}`}>${currentSpend.toFixed(5)}</span>
+            <span className="text-border/60 mx-0.5">|</span>
+            <span className="text-muted-foreground">All-time</span>
+            <span className="font-bold tabular-nums text-amber-500">${allTimeCost.toFixed(5)}</span>
+            <span className="ml-auto text-muted-foreground/50 cursor-help" title="OpenAI dashboard = all runs combined. 'Run' resets each search.">ⓘ</span>
           </div>
 
           <div className="flex flex-col gap-3 bg-muted/30 p-3 border border-border">
@@ -211,14 +275,6 @@ const ConfigPanel = ({
           </div>
         </div>
 
-        <button
-          onClick={isRunning ? onStop : onStart}
-          className={`mt-2 w-full flex items-center justify-center gap-3 py-4 text-sm transition-all duration-300 ${isRunning ? 'btn-danger-glow' : 'btn-primary-glow'
-            }`}
-        >
-          {isRunning ? <Square className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-          {isRunning ? "STOP" : "GENERATE LEADS"}
-        </button>
       </motion.div>
       <QueryHistoryModal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} />
     </>

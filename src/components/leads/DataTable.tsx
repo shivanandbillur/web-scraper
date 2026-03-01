@@ -121,7 +121,8 @@ const DataTable = ({ activeList, onDeleteLeads, onImportLeads }: Props) => {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.3 }}
-      className="glass-panel flex flex-col overflow-hidden h-full"
+      className="glass-panel flex flex-col overflow-hidden"
+      style={{ height: '100%', minHeight: '600px' }}
     >
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between bg-card">
@@ -156,6 +157,28 @@ const DataTable = ({ activeList, onDeleteLeads, onImportLeads }: Props) => {
           </button>
         </div>
       </div>
+
+      {/* Session metadata banner */}
+      {activeList && (activeList.prompt || activeList.scanned !== undefined) && (
+        <div className="px-4 py-2 border-b border-border bg-muted/20 flex flex-wrap items-center gap-x-4 gap-y-1">
+          {activeList.prompt && (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1 min-w-0">
+              <span className="text-foreground/50 shrink-0">Prompt:</span>
+              <span className="truncate max-w-[260px] text-foreground/80" title={activeList.prompt}>{activeList.prompt}</span>
+            </span>
+          )}
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1.5 ml-auto">
+            {activeList.scanned !== undefined && <span>Scanned <b className="text-foreground">{activeList.scanned}</b></span>}
+            {activeList.rejected !== undefined && <span>· Rejected <b className="text-red-400">{activeList.rejected}</b></span>}
+            {activeList.costSpent !== undefined && activeList.costSpent > 0 && (
+              <span className="ml-1 text-emerald-400 font-bold">${activeList.costSpent.toFixed(5)}</span>
+            )}
+            {activeList.status === 'running' && (
+              <span className="ml-1 text-[9px] font-bold text-blue-400 animate-pulse border border-blue-400/30 px-1.5 py-0.5 rounded-full">● LIVE</span>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Search + Bulk Actions Bar */}
       <div className="p-3 border-b border-border flex items-center gap-3 bg-card/50">
