@@ -113,7 +113,7 @@ const ConfigPanel = ({
             <textarea
               value={naturalQuery}
               onChange={(e) => setNaturalQuery(e.target.value)}
-              placeholder="e.g. Find me BTL managers or offline marketing managers in India..."
+              placeholder="e.g. Find me SaaS founders in New York or Data Scientists in London..."
               className="input-field w-full px-4 py-3 h-28 resize-none text-sm"
             />
             <div className="mt-2 flex flex-wrap gap-2">
