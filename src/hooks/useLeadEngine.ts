@@ -87,11 +87,11 @@ export function useLeadEngine() {
     addLog("Backend not available. Running demo simulation...", "info");
 
     const demoLeads: LeadItem[] = [
-      { url: "https://linkedin.com/in/rahul-sharma", data: [{ name: "Rahul Sharma", jobTitle: "BTL Marketing Manager", company: "Hindustan Unilever", location: "Mumbai, India", emails: ["rahul@example.com"], rawBio: "Experienced BTL marketing professional" }] },
-      { url: "https://linkedin.com/in/priya-menon", data: [{ name: "Priya Menon", jobTitle: "Offline Marketing Head", company: "ITC Limited", location: "Bangalore, India", emails: [], rawBio: "Leading offline marketing campaigns" }] },
-      { url: "https://linkedin.com/in/amit-patel", data: [{ name: "Amit Patel", jobTitle: "Experiential Marketing Director", company: "Godrej Consumer", location: "Delhi, India", emails: ["amit.p@example.com"], rawBio: "BTL & experiential marketing expert" }] },
-      { url: "https://linkedin.com/in/sneha-reddy", data: [{ name: "Sneha Reddy", jobTitle: "Brand Activation Manager", company: "Marico", location: "Hyderabad, India", emails: [], rawBio: "Brand activation and trade marketing" }] },
-      { url: "https://linkedin.com/in/vikram-singh", data: [{ name: "Vikram Singh", jobTitle: "Trade Marketing Manager", company: "Dabur India", location: "Noida, India", emails: ["vikram@example.com"], rawBio: "Trade marketing and distribution" }] },
+      { url: "https://linkedin.com/in/demo-user-1", data: [{ name: "Alex Chen", jobTitle: "Software Engineer", company: "Tech Corp", location: "San Francisco, USA", emails: ["alex@example.com"], rawBio: "Experienced full-stack developer" }] },
+      { url: "https://linkedin.com/in/demo-user-2", data: [{ name: "Sarah Jenkins", jobTitle: "Marketing Director", company: "Growth Co", location: "London, UK", emails: [], rawBio: "Leading global marketing campaigns" }] },
+      { url: "https://linkedin.com/in/demo-user-3", data: [{ name: "Maria Garcia", jobTitle: "Product Manager", company: "Innovate Inc", location: "Madrid, Spain", emails: ["maria.g@example.com"], rawBio: "Building products that users love" }] },
+      { url: "https://linkedin.com/in/demo-user-4", data: [{ name: "David Kim", jobTitle: "Sales Executive", company: "Cloud Solutions", location: "New York, USA", emails: [], rawBio: "Enterprise software sales" }] },
+      { url: "https://linkedin.com/in/demo-user-5", data: [{ name: "Priya Patel", jobTitle: "Data Scientist", company: "AI Research Lab", location: "Bangalore, India", emails: ["priya@example.com"], rawBio: "Machine learning and predictive modeling" }] },
     ];
 
     let i = 0;

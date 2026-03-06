@@ -68,8 +68,8 @@ export default function InfoModal() {
                                         <h3 className="font-bold uppercase tracking-wider text-sm">3. Filtering ICP (Ideal Customer Profile)</h3>
                                     </div>
                                     <p className="text-xs text-muted-foreground ml-6 space-y-2 leading-relaxed">
-                                        <span className="block">• <strong>Strict Domain Rule:</strong> It inherently parses the domain. Any foreign mirror variant (like <code>ca.linkedin.com</code> or <code>uk.linkedin.com</code>) is immediately dropped. Only strictly <code>in.linkedin.com</code> Indian domains pass through.</span>
-                                        <span className="block">• <strong>Text Negations:</strong> It parses the snippet descriptions and forcefully removes anyone whose bio specifies unwanted countries (USA, UAE, Australia, etc.).</span>
+                                        <span className="block">• <strong>Flexible Domain Rule:</strong> It inherently parses the domain to fetch leads from anywhere globally based on your specific search criteria.</span>
+                                        <span className="block">• <strong>Text Negations:</strong> It parses the snippet descriptions and forcefully removes anyone whose bio matches the negative exclusions provided.</span>
                                         <span className="block">• <strong>AI Dynamic Exclusions:</strong> If toggled on, the AI infers anti-persona roles (e.g., student, intern, vendor) and tests regex logic against the prospect's bio, filtering out unqualified hits on the fly.</span>
                                     </p>
                                 </section>
